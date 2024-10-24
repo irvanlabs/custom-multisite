@@ -1,0 +1,114 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Provider {
+  id        Int      @id @default(autoincrement())
+  name      String
+  apiKey1   String?
+  apiKey2   String?
+  sites     Site[]   // Relasi ke Site
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Site {
+  id          Int      @id @default(autoincrement())
+  name        String
+  domain      String
+  tld         String
+  userId      Int
+  isActive    Boolean @default(false)
+  isVerified  Boolean @default(false)
+  status      DomainStatus @default(PENDING) // Menggunakan enum untuk status domain
+  verifiedAt  DateTime?
+  providerId  Int
+  provider    Provider @relation(fields: [providerId], references: [id])
+  dnsRecords  SiteDns[]
+  verifications SiteVerification[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SiteDns {
+  id                Int      @id @default(autoincrement())
+  nameserver1       String
+  nameserver2       String
+  nameserver3       String
+  nameserver4       String
+  cloudflareZoneId  String?  // ID dari Cloudflare untuk manajemen DNS
+  digitalOceanId    String?  // ID dari DigitalOcean untuk droplet atau record
+  formerNameserver1 String
+  formerNameserver2 String
+  formerNameserver3 String
+  formerNameserver4 String
+  siteId            Int
+  site              Site     @relation(fields: [siteId], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+
+model SiteVerification {
+  id          Int          @id @default(autoincrement())
+  type        VerificationType
+  value       String
+  alias String?
+  isVerified  Boolean
+  verifiedAt  DateTime?
+  retryCount  Int          @default(0)     // Jumlah percobaan verifikasi
+  lastAttemptAt DateTime?  // Waktu terakhir percobaan verifikasi
+  siteId      Int
+  site        Site          @relation(fields: [siteId], references: [id])
+  status      VerificationStatus @default(PENDING) // Status pengecekan di queue
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+enum VerificationStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum VerificationType {
+  CNAME
+  TXT
+  MX
+}
+
+enum SiteStatus {
+  PENDING
+  FAILED
+  VERIFIED
+  ACTIVE
+}
+
+enum DomainStatus {
+  PENDING
+  FAILED
+  VERIFIED
+  ACTIVE
+}
+
+model WebhookLog {
+  id         Int      @id @default(autoincrement())
+  provider   String   // Nama provider, misal "Cloudflare", "DigitalOcean"
+  event      String   // Event webhook, misal "domain_update", "dns_update"
+  payload    String   // Payload yang diterima dari webhook
+  status     String   // Status, misal "processed", "failed"
+  error      String?  // Error jika ada
+  createdAt  DateTime @default(now())
+}
